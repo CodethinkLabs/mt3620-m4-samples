@@ -1,0 +1,36 @@
+[submodule "I2C_RTApp_MT3620_BareMetal/lib"]
+	path = I2C_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "SPI_RTApp_MT3620_BareMetal/lib"]
+	path = SPI_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "ADC_RTApp_MT3620_BareMetal/lib"]
+	path = ADC_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "ADC_Joystick_RTApp_MT3620_BareMetal/lib"]
+	path = ADC_Joystick_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "I2C_OLED_RTApp_MT3620_BareMetal/lib"]
+	path = I2C_OLED_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "SPI_SSD1331_RTApp_MT3620_BareMetal/lib"]
+	path = SPI_SSD1331_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "SPI_SDCard_RTApp_MT3620_BareMetal/lib"]
+	path = SPI_SDCard_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "UART_RTApp_MT3620_BareMetal/lib"]
+	path = UART_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "GPIO_ADC_RTAPP_MT3620_BareMetal/lib"]
+	path = GPIO_ADC_RTAPP_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "GPT_RTApp_MT3620_BareMetal/lib"]
+	path = GPT_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "PWM_RTApp_MT3620_BareMetal/lib"]
+	path = PWM_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "I2S_RTApp_MT3620_BareMetal/lib"]
+	path = I2S_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
