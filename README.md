@@ -20,7 +20,7 @@ git clone https://github.com/CodethinkLabs/mt3620-m4-samples
 
 The `libs/` code has been replicated for every sample (to keep them
 independent and simple to use out of the box). Therefore; you will also need to
-initialize the submodule in each sample directory that points to the 
+initialize the submodule in each sample directory that points to the
 [drivers repo](https://github.com/CodethinkLabs/mt3620-m4-drivers), by doing:
 
 ```
@@ -31,14 +31,14 @@ at the top level of this repository.
 
 # Prerequisites
 
-1. [Seeed MT3620 Development Kit](https://aka.ms/azurespheredevkits) or other 
+1. [Seeed MT3620 Development Kit](https://aka.ms/azurespheredevkits) or other
    hardware that implements the [MT3620 Reference Development Board (RDB)](https://docs.microsoft.com/azure-sphere/hardware/mt3620-reference-board-design)
    design. Note that all the connection diagrams for the samples assume the
    Seed dev kit.
 2. A breakout board and USB-to-serial adapter (for example,
    [FTDI Friend](https://www.digikey.com/catalog/en/partgroup/ftdi-friend/60311))
    to connect the real-time core UART to a USB port on your PC.
-3. A terminal emulator (such as Telnet or 
+3. A terminal emulator (such as Telnet or
    [PuTTY](https://www.chiark.greenend.org.uk/~sgtatham/putty/)) to display
    the output.
 
@@ -47,15 +47,28 @@ at the top level of this repository.
 1. Ensure that your Azure Sphere device is connected to your PC, and your PC
    is connected to the internet.
 2. Even if you've performed this set up previously, ensure that you have Azure
-   Sphere SDK version 19.10 or above. In an Azure Sphere Developer Command
-   Prompt, run:
+   Sphere [SDK version 19.10](https://docs.microsoft.com/en-us/azure-sphere/resources/release-notes-1910)
+   or above. In an Azure Sphere Developer Command Prompt, run:
    ```
    azsphere show-version
    ```
    to check.
    Download and install the [latest SDK](https://aka.ms/AzureSphereSDKDownload)
    as needed.
-3. Right-click the Azure Sphere Developer Command Prompt shortcut and select 
+
+   For the I2S samples to work, the device has to be on the 19.11 OS (distinct
+   from the SDK). To do this, ensure you have the 19.10 SDK installed, then
+   with your device attached:
+
+   - Run the following commands in the Azure Sphere Developer Command Prompt:
+   ```
+   azsphere product create --name MyProduct
+   azsphere device update --productname MyProduct --devicegroupname Development
+   ```
+   - Ensure the device is on wifi.
+   - Reset the device to force it to check for OS updates.
+
+3. Right-click the Azure Sphere Developer Command Prompt shortcut and select
    **More > Run as administrator**.
 4. At the command prompt, issue the following command:
 
@@ -63,7 +76,7 @@ at the top level of this repository.
    azsphere device enable-development -enablertcoredebugging
    ```
 
-   This command must be run as administrator when you enable real-time core 
+   This command must be run as administrator when you enable real-time core
    debugging because it installs USB drivers for the debugger.
 5. Close the window after the command completes because administrator privilege
    is no longer required.
@@ -72,7 +85,7 @@ at the top level of this repository.
 
 Note: All the samples require you to connect your USB-to-serial adapter to the
 debug UART.
-To connect to the debug UART on the Seed MT3620 dev kit, (and assuming FTDI 
+To connect to the debug UART on the Seed MT3620 dev kit, (and assuming FTDI
 Friend or similar) connect:
 
     - RX  -> H3.6 (IO0_TXD)
