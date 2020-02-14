@@ -48,7 +48,7 @@ static void HandleButtonTimerIrqDeferred(void)
     if (newState != prevState) {
         bool pressed = !newState;
         if (pressed) {
-            UART_Print(driver, "RTCore: Hello world!\r\n");
+            UART_Print(driver, "RTCore: Hello world!");
         }
 
         prevState = newState;
