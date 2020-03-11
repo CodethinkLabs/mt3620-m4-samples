@@ -5,7 +5,7 @@
   "EntryPoint": "/bin/app",
   "CmdArgs": [],
   "Capabilities": {
-    "Gpio": [ 12, 45, 46, 47, 48 ]
+    "Gpio": [ 12, 28, 31, 44, 45, 46, 47, 48, 60, 66, 70 ]
   },
   "ApplicationType": "RealTimeCapable"
 }

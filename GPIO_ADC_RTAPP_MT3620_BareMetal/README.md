@@ -25,6 +25,13 @@ Press A to cycle LED state (cycles R-G-B(Play LED)-R(Wifi LED))
 
 ![Connection Diagram](Connection%20Diagram.png)
 
+In addition, you can optionally connect the following GPIOs together to check that
+individual blocks are working correctly:
+
+GPIO 60 -> 70
+GPIO 28 -> 66
+GPIO 31 -> 44
+
 Note: we assume the use of MT3620 Reference Development Board (RDB) hardware,
 such as the MT3620 development kit from Seeed Studio. Different Azure Sphere
 hardware may require different wiring: consult its manufacturer’s

@@ -21,6 +21,14 @@ static UART* debug = NULL;
 #define GPIO_PLAY_B 47
 #define GPIO_WIFI_R 48
 
+#define GPIO_OUT_0 60
+#define GPIO_OUT_1 28
+#define GPIO_OUT_2 31
+
+#define GPIO_IN_0 70
+#define GPIO_IN_1 66
+#define GPIO_IN_2 44
+
 #define NUM_LEDS 4
 static bool LED[NUM_LEDS] = {false, true, true, true};
 static uint32_t activeLED = 0;
@@ -31,6 +39,27 @@ static void HandleButtonTimerIrq(GPT *);
 static void HandleButtonTimerIrqDeferred(void);
 
 static GPT *buttonTimeout = NULL;
+
+static void updateCountingGPIOs()
+{
+    static uint8_t count = 0;
+
+    GPIO_Write(GPIO_OUT_0, (count >> 0) & 1);
+    GPIO_Write(GPIO_OUT_1, (count >> 1) & 1);
+    GPIO_Write(GPIO_OUT_2, (count >> 2) & 1);
+
+    bool inBits[3];
+
+    GPIO_Read(GPIO_IN_0, &inBits[0]);
+    GPIO_Read(GPIO_IN_1, &inBits[1]);
+    GPIO_Read(GPIO_IN_2, &inBits[2]);
+
+    uint8_t countRead = inBits[0] + (inBits[1] << 1) + (inBits[2] << 2);
+
+    UART_Printf(debug, "count: %u, countRead: %u\r\n", count, countRead);
+
+    count = (count + 1) % 8;
+}
 
 static void updateLEDs()
 {
@@ -73,6 +102,7 @@ static void HandleButtonTimerIrqDeferred(void)
             LED[activeLED] = false;
 
             updateLEDs();
+            updateCountingGPIOs();
         }
         prevState = newState;
     }
@@ -122,11 +152,17 @@ _Noreturn void RTCoreMain(void)
     UART_Print(debug, "Press A to cycle LED state (cycles R-G-B(Play LED)-R(Wifi LED))\r\n");
 
     GPIO_ConfigurePinForInput(buttonAGpio);
+    GPIO_ConfigurePinForInput(GPIO_IN_0);
+    GPIO_ConfigurePinForInput(GPIO_IN_1);
+    GPIO_ConfigurePinForInput(GPIO_IN_2);
 
     GPIO_ConfigurePinForOutput(GPIO_PLAY_R);
     GPIO_ConfigurePinForOutput(GPIO_PLAY_G);
     GPIO_ConfigurePinForOutput(GPIO_PLAY_B);
     GPIO_ConfigurePinForOutput(GPIO_WIFI_R);
+    GPIO_ConfigurePinForOutput(GPIO_OUT_0);
+    GPIO_ConfigurePinForOutput(GPIO_OUT_1);
+    GPIO_ConfigurePinForOutput(GPIO_OUT_2);
 
     updateLEDs();
 
