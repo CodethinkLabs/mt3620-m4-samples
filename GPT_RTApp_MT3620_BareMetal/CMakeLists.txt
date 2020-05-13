@@ -9,6 +9,9 @@ ADD_EXECUTABLE(${PROJECT_NAME} main.c lib/VectorTable.c lib/GPIO.c lib/UART.c li
 TARGET_LINK_LIBRARIES(${PROJECT_NAME})
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/linker.ld)
 
+azsphere_configure_tools(TOOLS_REVISION "20.04")
+azsphere_configure_api(TARGET_API_SET "5+Beta2004")
+
 # Add MakeImage post-build command
 INCLUDE("${AZURE_SPHERE_MAKE_IMAGE_FILE}")
 
