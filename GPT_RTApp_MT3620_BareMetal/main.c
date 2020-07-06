@@ -425,7 +425,7 @@ static void InvokeCallbacks(void)
 _Noreturn void RTCoreMain(void)
 {
     VectorTableInit();
-    CPUFreq_Set(196700000);
+    CPUFreq_Set(197600000);
 
     debug = UART_Open(MT3620_UNIT_UART_DEBUG, 115200, UART_PARITY_NONE, 1, NULL);
     UART_Print(debug, "--------------------------------\r\n");
