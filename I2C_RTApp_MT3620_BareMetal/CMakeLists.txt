@@ -12,6 +12,6 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR
 azsphere_configure_tools(TOOLS_REVISION "20.07")
 
 # Add MakeImage post-build command
-include("${AZURE_SPHERE_MAKE_IMAGE_FILE}")
+azsphere_target_add_image_package(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME} PUBLIC -L"${CMAKE_SOURCE_DIR}")
