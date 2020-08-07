@@ -6,7 +6,7 @@
   "CmdArgs": [],
   "Capabilities": {
     "Gpio": [ 12 ],
-    "Uart": [ "ISU0" ],
+    "Uart": [ "ISU0" ]
   },
   "ApplicationType": "RealTimeCapable"
 }
