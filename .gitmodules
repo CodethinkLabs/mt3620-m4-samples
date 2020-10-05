@@ -34,3 +34,6 @@
 [submodule "I2S_RTApp_MT3620_BareMetal/lib"]
 	path = I2S_RTApp_MT3620_BareMetal/lib
 	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "IntercoreComms_Mailbox/IntercoreComms_RTApp_MT3620_BareMetal/lib"]
+	path = IntercoreComms_Mailbox/IntercoreComms_RTApp_MT3620_BareMetal/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
