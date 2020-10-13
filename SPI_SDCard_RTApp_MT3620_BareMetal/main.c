@@ -17,16 +17,15 @@
 #include "SD.h"
 
 
-static const uint32_t buttonAGpio = 12;
-static const int buttonPressCheckPeriodMs = 10;
-static void HandleButtonTimerIrq(GPT *);
-static void HandleButtonTimerIrqDeferred(void);
+#define NUM_BUTTONS         2
+#define MAX_WRITE_BLOCK_LEN 1024
 
-static UART      *debug  = NULL;
-static SPIMaster *driver = NULL;
-static SDCard    *card   = NULL;
-static GPT *buttonTimeout = NULL;
+static GPT       *buttonTimeout = NULL;
+static UART      *debug         = NULL;
+static SPIMaster *driver        = NULL;
+static SDCard    *card          = NULL;
 
+// Callbacks
 typedef struct CallbackNode {
     bool enqueued;
     struct CallbackNode *next;
@@ -35,43 +34,83 @@ typedef struct CallbackNode {
 
 static void EnqueueCallback(CallbackNode *node);
 
-static void HandleButtonTimerIrq(GPT *handle)
+// Read Block
+static void buttonA(void)
 {
-    (void)handle;
-    static CallbackNode cbn = {.enqueued = false, .cb = HandleButtonTimerIrqDeferred};
-    EnqueueCallback(&cbn);
+    UART_Print(debug, "Reading card:\r\n");
+    uintptr_t blocklen = SD_GetBlockLen(card);
+    uint8_t buff[blocklen];
+    if (!SD_ReadBlock(card, 0, buff)) {
+        UART_Print(debug,
+            "ERROR: Failed to read first block of SD card\r\n");
+    } else {
+        UART_Print(debug, "SD Card Data:\r\n");
+        uintptr_t i;
+        for (i = 0; i < blocklen; i++) {
+            UART_PrintHexWidth(debug, buff[i], 2);
+            UART_Print(debug, ((i % 16) == 15 ? "\r\n" : " "));
+        }
+        if ((blocklen % 16) != 0) {
+            UART_Print(debug, "\r\n");
+        }
+        UART_Print(debug, "\r\n");
+    }
 }
 
-static void HandleButtonTimerIrqDeferred(void)
+// Write Block
+static void buttonB(void)
 {
-    // Assume initial state is high, i.e. button not pressed.
-    static bool prevState = true;
-    bool newState;
-    GPIO_Read(buttonAGpio, &newState);
+    UART_Print(debug, "Writing to card: ");
 
-    if (newState != prevState) {
-        bool pressed = !newState;
-        if (pressed) {
-            uintptr_t blocklen = SD_GetBlockLen(card);
-            uint8_t buff[blocklen];
-            if (!SD_ReadBlock(card, 0, buff)) {
-                UART_Print(debug,
-                    "ERROR: Failed to read first block of SD card\r\n");
-            } else {
-                UART_Print(debug, "SD Card Data:\r\n");
-                uintptr_t i;
-                for (i = 0; i < blocklen; i++) {
-                    UART_PrintHexWidth(debug, buff[i], 2);
-                    UART_Print(debug, ((i % 16) == 15 ? "\r\n" : " "));
-                }
-                if ((blocklen % 16) != 0) {
-                    UART_Print(debug, "\r\n");
-                }
-                UART_Print(debug, "\r\n");
+    static uint8_t buff[MAX_WRITE_BLOCK_LEN] = {0};
+    static uint8_t multiplier                = 1;
+    uintptr_t blocklen = SD_GetBlockLen(card);
+
+    // update buffer
+    for (uintptr_t i = 0; i < blocklen; i++) {
+        buff[i] = (uint8_t)((i * multiplier) % 255);
+    }
+    if (!SD_WriteBlock(card, 0, buff)) {
+        UART_Print(debug,
+            "FAIL\r\nERROR: Failed to write first block of SD card\r\n");
+    }
+    else {
+        UART_Printf(debug, "OK (x%u)\r\n", multiplier);
+    }
+
+    multiplier++;
+}
+
+typedef struct ButtonState {
+    bool         prevState;
+    CallbackNode cbn;
+    uint32_t     gpioPin;
+} ButtonState;
+
+static ButtonState buttons[NUM_BUTTONS] = {
+    {.prevState = true,
+     .cbn = {.enqueued = false, .cb = buttonA},
+     .gpioPin   = 12},
+    {.prevState = true,
+     .cbn = {.enqueued = false, .cb = buttonB},
+     .gpioPin   = 13}
+};
+
+static void handleButtonCallback(GPT *handle)
+{
+    (void)(handle);
+    // Assume initial state is high, i.e. button not pressed.
+    bool newState, pressed;
+
+    for (unsigned i = 0; i < NUM_BUTTONS; i++) {
+        GPIO_Read(buttons[i].gpioPin, &newState);
+        if (newState != buttons[i].prevState) {
+            pressed = !newState;
+            if (pressed) {
+                EnqueueCallback(&buttons[i].cbn);
             }
         }
-
-        prevState = newState;
+        buttons[i].prevState = newState;
     }
 }
 
@@ -134,9 +173,12 @@ _Noreturn void RTCoreMain(void)
     }
 
 	UART_Print(debug,
-        "Press button A to read block.\r\n");
+        "Press button A to read block, and B to write block.\r\n"
+        "Note that with every press of B, the multiplier on each\r\n"
+        "byte is incremented.\r\n\r\n");
 
-    GPIO_ConfigurePinForInput(buttonAGpio);
+    GPIO_ConfigurePinForInput(buttons[0].gpioPin);
+    GPIO_ConfigurePinForInput(buttons[1].gpioPin);
 
     // Setup GPT0 to poll for button press
     if (!(buttonTimeout = GPT_Open(MT3620_UNIT_GPT0, 1000, GPT_MODE_REPEAT))) {
@@ -144,8 +186,8 @@ _Noreturn void RTCoreMain(void)
     }
     int32_t error;
 
-    if ((error = GPT_StartTimeout(buttonTimeout, buttonPressCheckPeriodMs,
-                                  GPT_UNITS_MILLISEC, &HandleButtonTimerIrq)) != ERROR_NONE) {
+    if ((error = GPT_StartTimeout(
+        buttonTimeout, 100, GPT_UNITS_MILLISEC, handleButtonCallback)) != ERROR_NONE) {
         UART_Printf(debug, "ERROR: Starting timer (%ld)\r\n", error);
     }
 
