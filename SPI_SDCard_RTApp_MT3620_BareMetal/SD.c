@@ -3,6 +3,7 @@
 // This is the maximum number of SD cards which can be opened at once.
 #define SD_CARD_MAX 4
 #define SPI_SD_TIMEOUT 10 // [s]
+#define NUM_RETRIES 65536
 
 static GPT *timer = NULL;
 
@@ -48,6 +49,20 @@ typedef enum {
     APP_SET_CLR_CARD_DETECT    = 42,
     APP_SEND_SCR               = 51,
 } SD_ACMD;
+
+typedef enum {
+    DATA_TOKEN_READ_SINGLE     = 0xFE,
+    DATA_TOKEN_READ_MULT       = 0xFE,
+    DATA_TOKEN_WRITE_SINGLE    = 0xFE,
+    DATA_TOKEN_WRITE_MULT      = 0xFC,
+    DATA_TOKEN_WRITE_MULT_STOP = 0xFD
+} SD_DATA_TOKEN;
+
+typedef enum {
+    DATA_RESP_ACCEPTED    = 0x5,
+    DATA_RESP_CRC_ERROR   = 0xB,
+    DATA_RESP_WRITE_ERROR = 0xD
+} SD_DATA_RESPONSE;
 
 typedef struct __attribute__((__packed__)) {
     uint8_t  index;
@@ -305,7 +320,7 @@ static bool SD_Command(SPIMaster *interface, SD_CMD cmd, uint32_t argument,
 
 static bool SD_ReadDataPacket(const SDCard *card, uintptr_t size, void *data)
 {
-    unsigned retries = 65536;
+    unsigned retries = NUM_RETRIES;
     uint8_t byte = 0xFF;
     unsigned i;
     for (i = 0; (i < retries) && (byte == 0xFF); i++) {
@@ -313,7 +328,7 @@ static bool SD_ReadDataPacket(const SDCard *card, uintptr_t size, void *data)
             return false;
         }
     }
-    if (byte != 0xFE) {
+    if (byte != DATA_TOKEN_READ_SINGLE) {
         return false;
     }
 
@@ -339,6 +354,71 @@ static bool SD_ReadDataPacket(const SDCard *card, uintptr_t size, void *data)
 
     // Clock burst is required here to give the card time to recover?
     SD_ClockBurst(card->interface, 32, false);
+
+    return true;
+}
+
+static bool SD_WriteDataPacket(SDCard *card, uintptr_t size, const void *data)
+{
+    // Clock burst for >= 1 byte
+    SD_ClockBurst(card->interface, 2, false);
+
+    // Write data token
+    static uint8_t write_token = DATA_TOKEN_WRITE_SINGLE;
+    if (!SPITransfer__AsyncTimeout(card->interface, &write_token, 1, SPI_WRITE)) {
+        return false;
+    }
+
+    // Write data
+    uint8_t *data_byte = (uint8_t*)data;
+    uintptr_t packet = 16;
+    uintptr_t remain = size;
+    for (remain = size; remain; remain -= packet, data_byte += packet) {
+        if (packet > remain) {
+            packet = remain;
+        }
+
+        if (!SPITransfer__AsyncTimeout(
+            card->interface, data_byte, packet, SPI_WRITE))
+        {
+            return false;
+        }
+    }
+
+    // Write crc
+    // TODO: implement 16 bit crc calc (SPI mode SD cards ignore CRC)
+    static uint16_t blank_crc = 0xFFFF;
+    if (!SPITransfer__AsyncTimeout(
+        card->interface, &blank_crc, sizeof(blank_crc), SPI_WRITE))
+    {
+        return false;
+    }
+
+    // Read data response
+    unsigned retries = NUM_RETRIES;
+    uint8_t byte = 0xFF;
+    unsigned i;
+    for (i = 0; (i < retries) && (byte == 0xFF); i++) {
+        if (!SPITransfer__AsyncTimeout(card->interface, &byte, 1, SPI_READ)) {
+            return false;
+        }
+    }
+    if ((byte & 0xF) != DATA_RESP_ACCEPTED) {
+        return false;
+    }
+
+    // Wait while card holds MISO low (busy)
+    unsigned busy_waits = NUM_RETRIES;
+    byte = 0x00;
+    for (i = 0; (i < busy_waits) && (byte == 0x00); i++) {
+        if (!SPITransfer__AsyncTimeout(card->interface, &byte, 1, SPI_READ)) {
+            return false;
+        }
+    }
+
+    if (byte == 0x00) {
+        return false;
+    }
 
     return true;
 }
@@ -457,6 +537,7 @@ static bool SD_Initialize(SPIMaster *interface)
         && SD_SendOpCond(interface, 256));
 }
 
+
 SDCard *SD_Open(SPIMaster *interface)
 {
     static SDCard SD_Cards[SD_CARD_MAX] = {0};
@@ -505,6 +586,7 @@ SDCard *SD_Open(SPIMaster *interface)
     return card;
 }
 
+
 void SD_Close(SDCard *card)
 {
     card->interface = NULL;
@@ -516,6 +598,7 @@ uint32_t SD_GetBlockLen(const SDCard *card)
 {
     return (card ? card->blockLen : 0);
 }
+
 
 bool SD_SetBlockLen(SDCard *card, uint32_t len)
 {
@@ -553,4 +636,23 @@ bool SD_ReadBlock(const SDCard *card, uint32_t addr, void *data)
     }
 
     return SD_ReadDataPacket(card, card->blockLen, data);
+}
+
+
+bool SD_WriteBlock(SDCard *card, uint32_t addr, const void *data)
+{
+    if (!card || !data) {
+        return false;
+    }
+
+    SD_R1 response;
+    if (!SD_CommandIncomplete(card->interface, WRITE_BLOCK, addr, sizeof(response), &response)) {
+        return false;
+    }
+
+    if (response.mask != 0x00) {
+        return false;
+    }
+
+    return SD_WriteDataPacket(card, card->blockLen, data);
 }
