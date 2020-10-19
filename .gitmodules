@@ -37,3 +37,9 @@
 [submodule "IntercoreComms_Mailbox/IntercoreComms_RTApp_MT3620_BareMetal/lib"]
 	path = IntercoreComms_Mailbox/IntercoreComms_RTApp_MT3620_BareMetal/lib
 	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "ThreadX_RTApp_MT3620_AzureRTOS/lib"]
+	path = ThreadX_RTApp_MT3620_AzureRTOS/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "ThreadX_RTApp_MT3620_AzureRTOS/threadx"]
+	path = ThreadX_RTApp_MT3620_AzureRTOS/threadx
+	url = https://github.com/azure-rtos/threadx
