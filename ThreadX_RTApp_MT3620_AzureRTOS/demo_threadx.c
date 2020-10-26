@@ -191,16 +191,18 @@ UINT    status;
         /* Increment the thread counter.  */
         thread_0_counter++;
 
-        /* Print results.  */
-        UART_Printf(debug, "**** Azure Sphere ThreadX Demonstration **** (c) 2006-2020 \n\n");
-        UART_Printf(debug, "           thread 0 events sent:          %lu\n", thread_0_counter);
-        UART_Printf(debug, "           thread 1 messages sent:        %lu\n", thread_1_counter);
-        UART_Printf(debug, "           thread 2 messages received:    %lu\n", thread_2_counter);
-        UART_Printf(debug, "           thread 3 obtained semaphore:   %lu\n", thread_3_counter);
-        UART_Printf(debug, "           thread 4 obtained semaphore:   %lu\n", thread_4_counter);
-        UART_Printf(debug, "           thread 5 events received:      %lu\n", thread_5_counter);
-        UART_Printf(debug, "           thread 6 mutex obtained:       %lu\n", thread_6_counter);
-        UART_Printf(debug, "           thread 7 mutex obtained:       %lu\n\n", thread_7_counter);
+        /* Print results */
+        if (thread_0_counter % 10 == 0) {
+            UART_Printf(debug, "**** Azure Sphere ThreadX Demonstration **** (c) 2006-2020 \r\n");
+            UART_Printf(debug, "           thread 0 events sent:          %lu\r\n", thread_0_counter);
+            UART_Printf(debug, "           thread 1 messages sent:        %lu\r\n", thread_1_counter);
+            UART_Printf(debug, "           thread 2 messages received:    %lu\r\n", thread_2_counter);
+            UART_Printf(debug, "           thread 3 obtained semaphore:   %lu\r\n", thread_3_counter);
+            UART_Printf(debug, "           thread 4 obtained semaphore:   %lu\r\n", thread_4_counter);
+            UART_Printf(debug, "           thread 5 events received:      %lu\r\n", thread_5_counter);
+            UART_Printf(debug, "           thread 6 mutex obtained:       %lu\r\n", thread_6_counter);
+            UART_Printf(debug, "           thread 7 mutex obtained:       %lu\r\n", thread_7_counter);
+        }
 
         /* Sleep for 10 ticks.  */
         tx_thread_sleep(10);

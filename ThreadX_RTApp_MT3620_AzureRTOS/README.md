@@ -16,7 +16,12 @@ See the top level [README](../README.md) for details.
 
 1. Connect to the debug UART (H3.6 (IO0_TXD) and H3.2 (GND)) and open a terminal @115200-N-8-1
 2. Sideload the application.
-3. Observe debug messages prints:
+3. Observe debug messages from terminal. 
+   The number at the end of each line is showing how times each thread is executed. 
+   By using thread synchronization object like semaphore, queue or event flag, 
+   the code can precisely control how and when these tasks will scheduled. 
+
+   - The statistic numbers refreshes every second. 
 
 ```
 ThreadX_RTApp_MT3620_AzureRTOS
