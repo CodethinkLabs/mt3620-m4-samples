@@ -1,12 +1,10 @@
 {
   "SchemaVersion": 1,
-  "Name": "I2C_RTApp_MT3620_BareMetal",
-  "ComponentId": "18b8807b-541b-4953-8c9f-9135eedcc376",
+  "Name": "ThreadX_RTApp_MT3620_BareMetal",
+  "ComponentId": "ca263f3e-dad8-4ebb-8874-83c2317d8956",
   "EntryPoint": "/bin/app",
   "CmdArgs": [],
   "Capabilities": {
-    "Gpio": [ 12 ],
-    "I2cMaster": [ "ISU2" ]
   },
   "ApplicationType": "RealTimeCapable"
 }

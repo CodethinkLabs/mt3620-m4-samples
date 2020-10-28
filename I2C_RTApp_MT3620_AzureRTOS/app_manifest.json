@@ -1,0 +1,12 @@
+{
+  "SchemaVersion": 1,
+  "Name": "I2C_RTApp_MT3620_AzureRTOS",
+  "ComponentId": "378615c5-6815-43ae-9359-d81b5023a6fe",
+  "EntryPoint": "/bin/app",
+  "CmdArgs": [],
+  "Capabilities": {
+    "Gpio": [ 12 ],
+    "I2cMaster": [ "ISU2" ]
+  },
+  "ApplicationType": "RealTimeCapable"
+}
