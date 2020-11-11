@@ -9,7 +9,7 @@ ADD_LINK_OPTIONS(-specs=nano.specs -specs=nosys.specs)
 
 add_compile_definitions(USE_I2C_THREADX_API)
 
-include_directories(${CMAKE_SOURCE_DIR} 
+include_directories(${CMAKE_SOURCE_DIR}
 	                ${CMAKE_SOURCE_DIR}/lib
 					${CMAKE_SOURCE_DIR}/lib/mt3620)
 
@@ -23,7 +23,7 @@ add_subdirectory(threadx)
 target_link_libraries(${PROJECT_NAME} azrtos::threadx)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/linker.ld)
 
-azsphere_configure_tools(TOOLS_REVISION "20.07")
+azsphere_configure_tools(TOOLS_REVISION "20.10")
 
 # Add MakeImage post-build command
 azsphere_target_add_image_package(${PROJECT_NAME})

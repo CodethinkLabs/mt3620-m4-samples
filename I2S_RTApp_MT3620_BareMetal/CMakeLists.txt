@@ -9,7 +9,7 @@ add_executable(${PROJECT_NAME} main.c MAX98090.c lib/VectorTable.c lib/GPT.c lib
 target_link_libraries(${PROJECT_NAME})
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/linker.ld)
 
-azsphere_configure_tools(TOOLS_REVISION "20.07")
+azsphere_configure_tools(TOOLS_REVISION "20.10")
 
 # Add MakeImage post-build command
 azsphere_target_add_image_package(${PROJECT_NAME})
