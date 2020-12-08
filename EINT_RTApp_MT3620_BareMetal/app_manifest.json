@@ -1,0 +1,11 @@
+{
+  "SchemaVersion": 1,
+  "Name": "EINT_RTApp_MT3620_BareMetal",
+  "ComponentId": "18b8807b-541b-4953-8c9f-9135eedcc376",
+  "EntryPoint": "/bin/app",
+  "CmdArgs": [],
+  "Capabilities": {
+    "ExternalInterrupt": [ "EINT12", "EINT13" ]
+  },
+  "ApplicationType": "RealTimeCapable"
+}
