@@ -29,7 +29,10 @@
 
 #include "Socket.h"
 
-#define NUM_BUTTONS 2
+#define NUM_BUTTONS    2
+#define COUNTDOWN_INIT 5
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef enum {
     TIMER_BUTTONS,
@@ -45,7 +48,7 @@ static Socket *socket             = NULL;
 
 static unsigned gpioOut[2] = {0, 1};
 
-static volatile unsigned msgCounter = 0;
+static volatile unsigned countdown = COUNTDOWN_INIT;
 
 // Callbacks
 typedef struct CallbackNode {
@@ -86,13 +89,26 @@ static void handleSendMsgTimer(void* data)
         .seg_3_4 = {0xba, 0xe1, 0xac, 0x26, 0xfc, 0xdd, 0x36, 0x27}
     };
 
-    static char msg[] = "rt-app-to-hl-app-00";
-    const uintptr_t msgLen = sizeof(msg);
+    static char msg[]    = "count-00";
+    static char reboot[] = "reboot!!";
+    const uintptr_t msgLen    = sizeof(msg);
+    const uintptr_t rebootLen = sizeof(reboot);
 
-    msg[msgLen - 2] = '0' + (msgCounter % 10);
-    msg[msgLen - 3] = '0' + (msgCounter / 10);
+    msg[msgLen - 2] = '0' + (countdown % 10);
+    msg[msgLen - 3] = '0' + (countdown / 10);
 
-    int32_t error = Socket_Write(socket, &A7ID, msg, msgLen);
+    int32_t error = ERROR_NONE;
+    if (countdown == 0) {
+        UART_Printf(debug, "sending msg %s\r\n", reboot);
+        error = Socket_Write(socket, &A7ID, reboot, rebootLen);
+        countdown = COUNTDOWN_INIT;
+    }
+    else {
+        UART_Printf(debug, "sending msg %s\r\n", msg);
+        error = Socket_Write(socket, &A7ID, msg, msgLen);
+        /* Simulate reboot */
+        Socket_Reset(socket);
+    }
 
     if (error != ERROR_NONE) {
         UART_Printf(debug, "ERROR: sending msg %s - %ld\r\n", msg, error);
@@ -115,6 +131,15 @@ static void handleRecvMsg(void *handle)
     static char msg[32];
     uint32_t msg_size = sizeof(msg);
 
+    if (Socket_NegotiationPending(socket)) {
+        UART_Printf(debug, "Negotiation pending, attempting renegotiation\n");
+        // NB: this is blocking, if you want to protect against hanging,
+        //     add a timeout
+        if (Socket_Negotiate(socket) != ERROR_NONE) {
+            UART_Printf(debug, "ERROR: renegotiating socket connection\n");
+        }
+    }
+
     int32_t error = Socket_Read(socket, &senderId, msg, &msg_size);
 
     if (error != ERROR_NONE) {
@@ -133,6 +158,7 @@ static void handleRecvMsgWrapper(Socket *handle)
     if (!cbn.data) {
         cbn.data = handle;
     }
+
     EnqueueCallback(&cbn);
 }
 
@@ -141,16 +167,16 @@ static void handleRecvMsgWrapper(Socket *handle)
 static void buttonA(void *data)
 {
     (void)data;
-    msgCounter = (msgCounter + 1) % 100;
-    UART_Printf(debug, "Incrementing counter: %u\r\n", msgCounter);
+    countdown = (countdown - 1) % 100;
+    UART_Printf(debug, "Decrementing counter: %u\r\n", countdown);
 }
 
 // Enqueued when user presses B
 static void buttonB(void *data)
 {
     (void)data;
-    msgCounter = (msgCounter - 1) % 100;
-    UART_Printf(debug, "Decrementing counter: %u\r\n", msgCounter);
+    countdown = (countdown + 1) % 100;
+    UART_Printf(debug, "Incrementing counter: %u\r\n", countdown);
 }
 
 typedef struct ButtonState {
