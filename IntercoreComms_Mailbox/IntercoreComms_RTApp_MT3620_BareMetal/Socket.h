@@ -26,6 +26,9 @@ extern "C" {
 /// Returned when there's a space issue.</summary>
 #define ERROR_SOCKET_INSUFFICIENT_SPACE (ERROR_SPECIFIC - 1)
 
+/// Returned when negotiation fails.</summary>
+#define ERROR_SOCKET_NEGOTIATION        (ERROR_SPECIFIC - 2)
+
 typedef struct Socket Socket;
 
 /// When sending a message, this is the recipient HLApp's component ID.
@@ -42,8 +45,12 @@ typedef struct {
 } Component_Id;
 
 Socket* Socket_Open(void (*rx_cb)(Socket*));
-
 int32_t Socket_Close(Socket *socket);
+
+bool    Socket_NegotiationPending(Socket *socket);
+int32_t Socket_Negotiate(Socket *socket);
+
+void Socket_Reset(Socket *socket);
 
 int32_t Socket_Write(
     Socket             *socket,

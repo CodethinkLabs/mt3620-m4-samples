@@ -14,6 +14,8 @@
 
 #include "Socket.h"
 
+#define FIFO_MSG_NEG_LEN 3
+
 typedef struct __attribute__((__packed__)) {
     // read and write index in bytes
     uint32_t writeIndex;
@@ -94,6 +96,7 @@ static void Socket__Msg_Available(void *user_data, uint8_t port)
     {
         return;
     }
+
     Socket *handle = (Socket*)user_data;
 
     handle->rx_cb(handle);
@@ -112,22 +115,72 @@ Socket* Socket_Open(void (*rx_cb)(Socket*))
         return NULL;
     }
 
+    context.mailbox = mbox;
+    if (Socket_Negotiate(&context) != ERROR_NONE) {
+        Socket_Close(&context);
+        return NULL;
+    }
+
+    // Setup SW Interrupts
+    if (MBox_SW_Interrupt_Setup(
+            context.mailbox, SOCKET_PORT_FLAGS,
+            Socket__Msg_Available) != ERROR_NONE)
+    {
+        Socket_Close(&context);
+        return NULL;
+    }
+
+    // Update context
+    context.rx_cb = rx_cb;
+    context.open  = true;
+
+    return &context;
+}
+
+int32_t Socket_Close(Socket *socket)
+{
+    if (!socket || !socket->open) {
+        return ERROR_PARAMETER;
+    }
+
+    MBox_SW_Interrupt_Teardown(socket->mailbox);
+    MBox_FIFO_Close(socket->mailbox);
+    socket->open = false;
+
+    return ERROR_NONE;
+}
+
+
+bool Socket_NegotiationPending(Socket *socket)
+{
+    if (!socket)    {
+        return false;
+    }
+
+    return (MBox_FIFO_Reads_Available(socket->mailbox) != 0);
+}
+
+int32_t Socket_Negotiate(Socket *socket)
+{
+    if (!socket) {
+        return ERROR_SOCKET_NEGOTIATION;
+    }
+
     // Get buffer descriptors from MBox FIFO
-    uintptr_t fifoMsgLen = 3;
-    uint32_t  cmd[fifoMsgLen], data[fifoMsgLen];
+    uint32_t  cmd[FIFO_MSG_NEG_LEN], data[FIFO_MSG_NEG_LEN];
 
     // Block and wait for A7 core to negotiate buffer descriptors
-    if (MBox_FIFO_ReadSync(mbox, cmd, data, fifoMsgLen) != ERROR_NONE)
+    if (MBox_FIFO_ReadSync(socket->mailbox, cmd, data, FIFO_MSG_NEG_LEN) != ERROR_NONE)
     {
-        MBox_FIFO_Close(mbox);
-        return NULL;
+        MBox_FIFO_Close(socket->mailbox);
+        return ERROR_SOCKET_NEGOTIATION;
     }
 
     // Parse buffer descriptors
     Socket_Ringbuffer ringRemote, ringLocal;
     unsigned parsed = 0;
 
-    for (unsigned i = 0; i < fifoMsgLen; i++) {
+    for (unsigned i = 0; i < FIFO_MSG_NEG_LEN; i++) {
         switch (cmd[i]) {
         case SOCKET_CMD_LOCAL_BUFFER_DESC:
             ringLocal = Socket_Ringbuffer__Parse_Desc(data[i]);
@@ -152,39 +205,23 @@ Socket* Socket_Open(void (*rx_cb)(Socket*))
        (ringLocal.capacity == 0) ||
        (ringRemote.capacity == 0))
     {
-        MBox_FIFO_Close(mbox);
-        return NULL;
+        return ERROR_SOCKET_NEGOTIATION;
     }
 
-    // Setup SW Interrupts
-    if (MBox_SW_Interrupt_Setup(
-        mbox, SOCKET_PORT_FLAGS, Socket__Msg_Available) != ERROR_NONE)
-    {
-        MBox_FIFO_Close(mbox);
-        return NULL;
-    }
-
-    // Update context
-    context.mailbox     = mbox;
-    context.ringRemote = ringRemote;
-    context.ringLocal  = ringLocal;
-    context.rx_cb       = rx_cb;
-    context.open        = true;
-
-    return &context;
-}
-
-int32_t Socket_Close(Socket *socket)
-{
-    if (!socket || !socket->open) {
-        return ERROR_PARAMETER;
-    }
-
-    MBox_SW_Interrupt_Teardown(socket->mailbox);
-    MBox_FIFO_Close(socket->mailbox);
-    socket->open = false;
+    socket->ringRemote = ringRemote;
+    socket->ringLocal  = ringLocal;
 
     return ERROR_NONE;
+}
+
+
+void Socket_Reset(Socket *socket)
+{
+    if (!socket) {
+        return;
+    }
+
+    MBox_FIFO_Reset(socket->mailbox, true);
 }
 
 static void Socket__Signal(Socket *socket, uint8_t port)
