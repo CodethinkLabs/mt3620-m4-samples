@@ -10,12 +10,13 @@
 // - application (establish a connection with a real-time capable application).
 // - eventloop (system invokes handlers for timer events)
 
-#include <signal.h>
-#include <string.h>
-#include <stdio.h>
 #include <ctype.h>
-#include <stdbool.h>
 #include <errno.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <sys/time.h>
@@ -25,6 +26,8 @@
 #include <applibs/application.h>
 
 #include "eventloop_timer_utilities.h"
+
+#define RECV_BUFF_SIZE 32
 
 /// <summary>
 /// Exit codes for this application. These are used for the
@@ -42,7 +45,8 @@ typedef enum {
     ExitCode_Init_Connection = 7,
     ExitCode_Init_SetSockOpt = 8,
     ExitCode_Init_RegisterIo = 9,
-    ExitCode_Main_EventLoopFail = 10
+    ExitCode_Main_EventLoopFail = 10,
+    ExitCode_Main_EventLoopSimReboot = 11
 } ExitCode;
 
 static int sockFd = -1;
@@ -57,6 +61,7 @@ static void TerminationHandler(int signalNumber);
 static void SendTimerEventHandler(EventLoopTimer *timer);
 static void SendMessageToRTApp(void);
 static void SocketEventHandler(EventLoop *el, int fd, EventLoop_IoEvents events, void *context);
+static void InitSigterm(void);
 static ExitCode InitHandlers(void);
 static void CloseHandlers(void);
 
@@ -103,6 +108,15 @@ static void SendMessageToRTApp(void)
     }
 }
 
+static bool MsgParseIsReboot(char rxBuf[RECV_BUFF_SIZE], int len)
+{
+    if (!rxBuf || len <= 0) {
+        return false;
+    }
+
+    return (strncmp(rxBuf, "reboot!!", (size_t)len) == 0);
+}
+
 /// <summary>
 ///     Handle socket event by reading incoming data from real-time capable application.
 /// </summary>
@@ -110,7 +124,7 @@ static void SocketEventHandler(EventLoop *el, int fd, EventLoop_IoEvents events,
 {
     // Read response from real-time capable application.
     // If the RTApp has sent more than 32 bytes, then truncate.
-    char rxBuf[32];
+    char rxBuf[RECV_BUFF_SIZE];
     int bytesReceived = recv(fd, rxBuf, sizeof(rxBuf), 0);
     Log_Debug("SocketEventHandler\n");
 
@@ -125,6 +139,23 @@ static void SocketEventHandler(EventLoop *el, int fd, EventLoop_IoEvents events,
         Log_Debug("%c", isprint(rxBuf[i]) ? rxBuf[i] : '.');
     }
     Log_Debug("\n");
+
+    if (MsgParseIsReboot(rxBuf, bytesReceived)) {
+        Log_Debug("Simulated reboot cmd received\n");
+        exitCode = ExitCode_Main_EventLoopSimReboot;
+    }
+}
+
+
+/// <summary>
+///     Set up SIGTERM termination handler and event handlers for send timer
+/// </summary>
+static void InitSigterm(void)
+{
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = TerminationHandler;
+    sigaction(SIGTERM, &action, NULL);
 }
 
 /// <summary>
@@ -137,11 +168,6 @@ static void SocketEventHandler(EventLoop *el, int fd, EventLoop_IoEvents events,
 /// </returns>
 static ExitCode InitHandlers(void)
 {
-    struct sigaction action;
-    memset(&action, 0, sizeof(struct sigaction));
-    action.sa_handler = TerminationHandler;
-    sigaction(SIGTERM, &action, NULL);
-
     eventLoop = EventLoop_Create();
     if (eventLoop == NULL) {
         Log_Debug("Could not create event loop.\n");
@@ -209,10 +235,10 @@ static void CloseHandlers(void)
     CloseFdAndPrintError(sockFd, "Socket");
 }
 
-int main(void)
+
+static ExitCode RunLoop(void)
 {
-    Log_Debug("High-level intercore comms application\n");
-    Log_Debug("Sends data to, and receives data from a real-time capable application.\n");
+    Log_Debug("Running main loop.\n");
 
     exitCode = InitHandlers();
 
@@ -225,6 +251,30 @@ int main(void)
     }
 
     CloseHandlers();
+
+    if (exitCode == ExitCode_Main_EventLoopSimReboot) {
+        Log_Debug("Simulating reboot...\n");
+        static const struct timespec wait = {.tv_sec = 10, .tv_nsec = 0};
+        if (nanosleep(&wait, NULL) == -1) {
+            Log_Debug("WARNING: wait interrupted\n");
+        }
+        Log_Debug("Re-initialising\n");
+    }
+
+    return exitCode;
+}
+
+int main(void)
+{
+    Log_Debug("High-level intercore comms application\n");
+    Log_Debug("Sends data to, and receives data from a real-time capable application.\n");
+
+    InitSigterm();
+
+    ExitCode code;
+
+    while ((code = RunLoop()) == ExitCode_Main_EventLoopSimReboot);
+
     Log_Debug("Application exiting.\n");
     return exitCode;
 }
