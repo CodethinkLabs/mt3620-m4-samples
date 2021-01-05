@@ -202,6 +202,9 @@ static bool SPITransfer__SyncTimeout(
         return false;
     }
 
+    if (GPT_IsEnabled(timer)) {
+        GPT_Stop(timer);
+    }
     unsigned retries = NUM_RETRIES;
     while ((retries-- > 0) && (GPT_StartTimeout(
         timer, SPI_SD_TIMEOUT, GPT_UNITS_MILLISEC, NULL) == ERROR_NONE))
