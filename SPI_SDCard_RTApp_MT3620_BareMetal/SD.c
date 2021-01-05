@@ -1,9 +1,12 @@
+#include "lib/mt3620/gpt.h"
+
 #include "SD.h"
 
 // This is the maximum number of SD cards which can be opened at once.
-#define SD_CARD_MAX 4
-#define SPI_SD_TIMEOUT 10 // [s]
-#define NUM_RETRIES 65536
+#define SD_CARD_MAX       4
+#define SPI_SD_TIMEOUT    200 // [ms]
+#define NUM_RETRIES       65536
+#define NUM_WRITE_RETRIES 3
 
 static GPT *timer = NULL;
 
@@ -163,7 +166,7 @@ typedef enum {
     SPI_WRITE = 1
 } SPI_TRANSFER_TYPE;
 
-static bool SPITransfer__AsyncTimeout(
+static bool SPITransfer__SyncTimeout(
     SPIMaster         *interface,
     void              *data,
     uintptr_t          length,
@@ -199,13 +202,21 @@ static bool SPITransfer__AsyncTimeout(
         return false;
     }
 
-    GPT_StartTimeout(timer, SPI_SD_TIMEOUT, GPT_UNITS_SECOND, NULL);
+    unsigned retries = NUM_RETRIES;
+    while ((retries-- > 0) && (GPT_StartTimeout(
+        timer, SPI_SD_TIMEOUT, GPT_UNITS_MILLISEC, NULL) == ERROR_NONE))
+        ;
+    if (retries == 0) {
+        transferStateReset();
+        return false;
+    }
 
     while (!transferState.done) {
         __asm__("wfi");
         if (!GPT_IsEnabled(timer)) {
             // Timed out, so cancel
             SPIMaster_TransferCancel(interface);
+            transferState.status = ERROR_TIMEOUT;
             break;
         }
     }
@@ -238,7 +249,7 @@ static bool SD_ClockBurst(SPIMaster* interface, unsigned cycles, bool select)
     // We use async here so we can timeout if the SD card hangs
     uint8_t dummy[(cycles + 7) / 8];
 
-    if (!SPITransfer__AsyncTimeout(interface, &dummy, sizeof(dummy), SPI_READ)) {
+    if (!SPITransfer__SyncTimeout(interface, &dummy, sizeof(dummy), SPI_READ)) {
         return false;
     }
 
@@ -257,7 +268,7 @@ static bool SD_AwaitResponse(SPIMaster *interface, uintptr_t size, void *respons
     uint8_t byte = 0xFF;
     unsigned i;
     for (i = 0; (i < retries) && (byte == 0xFF); i++) {
-        if (!SPITransfer__AsyncTimeout(interface, &byte, 1, SPI_READ)) {
+        if (!SPITransfer__SyncTimeout(interface, &byte, 1, SPI_READ)) {
             return false;
         }
     }
@@ -268,7 +279,7 @@ static bool SD_AwaitResponse(SPIMaster *interface, uintptr_t size, void *respons
         // If the response contains an error, it won't have a payload.
         size = 1;
     } else if (size > 1) {
-        if (!SPITransfer__AsyncTimeout(interface, &r[1], (size - 1), SPI_READ)) {
+        if (!SPITransfer__SyncTimeout(interface, &r[1], (size - 1), SPI_READ)) {
             return false;
         }
     }
@@ -285,7 +296,7 @@ static bool SD_CommandIncomplete(SPIMaster *interface, SD_CMD cmd, uint32_t argu
     frame.crc      = SD_Crc7(&frame, (sizeof(frame.index) + sizeof(frame.argument)));
 
 
-    if (!SPITransfer__AsyncTimeout(interface, &frame, sizeof(frame), SPI_WRITE)) {
+    if (!SPITransfer__SyncTimeout(interface, &frame, sizeof(frame), SPI_WRITE)) {
         return false;
     }
 
@@ -324,7 +335,7 @@ static bool SD_ReadDataPacket(const SDCard *card, uintptr_t size, void *data)
     uint8_t byte = 0xFF;
     unsigned i;
     for (i = 0; (i < retries) && (byte == 0xFF); i++) {
-        if (!SPITransfer__AsyncTimeout(card->interface, &byte, 1, SPI_READ)) {
+        if (!SPITransfer__SyncTimeout(card->interface, &byte, 1, SPI_READ)) {
             return false;
         }
     }
@@ -340,13 +351,13 @@ static bool SD_ReadDataPacket(const SDCard *card, uintptr_t size, void *data)
             packet = remain;
         }
 
-        if (!SPITransfer__AsyncTimeout(card->interface, data_byte, packet, SPI_READ)) {
+        if (!SPITransfer__SyncTimeout(card->interface, data_byte, packet, SPI_READ)) {
             return false;
         }
     }
 
     uint16_t crc;
-    if (!SPITransfer__AsyncTimeout(card->interface, &crc, sizeof(crc), SPI_READ)) {
+    if (!SPITransfer__SyncTimeout(card->interface, &crc, sizeof(crc), SPI_READ)) {
         return false;
     }
 
@@ -361,11 +372,11 @@ static bool SD_ReadDataPacket(const SDCard *card, uintptr_t size, void *data)
 static bool SD_WriteDataPacket(SDCard *card, uintptr_t size, const void *data)
 {
     // Clock burst for >= 1 byte
-    SD_ClockBurst(card->interface, 2, false);
+    SD_ClockBurst(card->interface, 16, false);
 
     // Write data token
     static uint8_t write_token = DATA_TOKEN_WRITE_SINGLE;
-    if (!SPITransfer__AsyncTimeout(card->interface, &write_token, 1, SPI_WRITE)) {
+    if (!SPITransfer__SyncTimeout(card->interface, &write_token, 1, SPI_WRITE)) {
         return false;
     }
 
@@ -378,7 +389,7 @@ static bool SD_WriteDataPacket(SDCard *card, uintptr_t size, const void *data)
             packet = remain;
         }
 
-        if (!SPITransfer__AsyncTimeout(
+        if (!SPITransfer__SyncTimeout(
             card->interface, data_byte, packet, SPI_WRITE))
         {
             return false;
@@ -388,7 +399,7 @@ static bool SD_WriteDataPacket(SDCard *card, uintptr_t size, const void *data)
     // Write crc
     // TODO: implement 16 bit crc calc (SPI mode SD cards ignore CRC)
     static uint16_t blank_crc = 0xFFFF;
-    if (!SPITransfer__AsyncTimeout(
+    if (!SPITransfer__SyncTimeout(
         card->interface, &blank_crc, sizeof(blank_crc), SPI_WRITE))
     {
         return false;
@@ -399,7 +410,7 @@ static bool SD_WriteDataPacket(SDCard *card, uintptr_t size, const void *data)
     uint8_t byte = 0xFF;
     unsigned i;
     for (i = 0; (i < retries) && (byte == 0xFF); i++) {
-        if (!SPITransfer__AsyncTimeout(card->interface, &byte, 1, SPI_READ)) {
+        if (!SPITransfer__SyncTimeout(card->interface, &byte, 1, SPI_READ)) {
             return false;
         }
     }
@@ -411,7 +422,7 @@ static bool SD_WriteDataPacket(SDCard *card, uintptr_t size, const void *data)
     unsigned busy_waits = NUM_RETRIES;
     byte = 0x00;
     for (i = 0; (i < busy_waits) && (byte == 0x00); i++) {
-        if (!SPITransfer__AsyncTimeout(card->interface, &byte, 1, SPI_READ)) {
+        if (!SPITransfer__SyncTimeout(card->interface, &byte, 1, SPI_READ)) {
             return false;
         }
     }
@@ -553,7 +564,8 @@ SDCard *SD_Open(SPIMaster *interface)
         return NULL;
     }
 
-    if (!(timer = GPT_Open(MT3620_UNIT_GPT1, 993, GPT_MODE_ONE_SHOT))) {
+    if (!(timer = GPT_Open(
+        MT3620_UNIT_GPT3, MT3620_GPT_3_LOW_SPEED, GPT_MODE_ONE_SHOT))) {
         return NULL;
     }
 
@@ -645,6 +657,8 @@ bool SD_WriteBlock(SDCard *card, uint32_t addr, const void *data)
         return false;
     }
 
+    static unsigned num_retries = NUM_WRITE_RETRIES;
+
     SD_R1 response;
     if (!SD_CommandIncomplete(card->interface, WRITE_BLOCK, addr, sizeof(response), &response)) {
         return false;
@@ -654,5 +668,17 @@ bool SD_WriteBlock(SDCard *card, uint32_t addr, const void *data)
         return false;
     }
 
-    return SD_WriteDataPacket(card, card->blockLen, data);
+    if (!SD_WriteDataPacket(card, card->blockLen, data)) {
+        if (num_retries > 0) {
+            num_retries--;
+            return SD_WriteBlock(card, addr, data);
+        }
+        else {
+            return false;
+        }
+    }
+    else {
+        num_retries = NUM_WRITE_RETRIES;
+        return true;
+    }
 }
