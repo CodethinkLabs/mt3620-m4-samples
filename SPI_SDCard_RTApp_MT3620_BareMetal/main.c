@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "lib/mt3620/gpt.h"
+
 #include "lib/CPUFreq.h"
 #include "lib/VectorTable.h"
 #include "lib/NVIC.h"
@@ -16,14 +18,22 @@
 
 #include "SD.h"
 
+/* Set below to control # of blocks read and written */
+//#define NUM_BLOCKS_WRITE 8388608 // 4GB
+#define NUM_BLOCKS_WRITE 2000
 
 #define NUM_BUTTONS         2
 #define MAX_WRITE_BLOCK_LEN 1024
+#define NUM_BLOCKS_RW_DELTA 1000UL
 
 static GPT       *buttonTimeout = NULL;
 static UART      *debug         = NULL;
 static SPIMaster *driver        = NULL;
 static SDCard    *card          = NULL;
+
+static uint8_t  dataMultiplier = 1;
+static uint32_t numBlocksWrite = NUM_BLOCKS_WRITE;
+static uint32_t numBlocksRead  = NUM_BLOCKS_WRITE - NUM_BLOCKS_RW_DELTA;
 
 // Callbacks
 typedef struct CallbackNode {
@@ -34,51 +44,106 @@ typedef struct CallbackNode {
 
 static void EnqueueCallback(CallbackNode *node);
 
+static void printSDBlock(uint8_t *buff, uintptr_t blocklen, unsigned blockID)
+{
+    UART_Printf(debug, "SD Card Data (block %u):\r\n", blockID);
+    uintptr_t i;
+    for (i = 0; i < blocklen; i++) {
+        UART_PrintHexWidth(debug, buff[i], 2);
+        UART_Print(debug, ((i % 16) == 15 ? "\r\n" : " "));
+    }
+    if ((blocklen % 16) != 0) {
+        UART_Print(debug, "\r\n");
+    }
+    UART_Print(debug, "\r\n");
+}
+
 // Read Block
 static void buttonA(void)
 {
     UART_Print(debug, "Reading card:\r\n");
     uintptr_t blocklen = SD_GetBlockLen(card);
     uint8_t buff[blocklen];
-    if (!SD_ReadBlock(card, 0, buff)) {
-        UART_Print(debug,
-            "ERROR: Failed to read first block of SD card\r\n");
-    } else {
-        UART_Print(debug, "SD Card Data:\r\n");
-        uintptr_t i;
-        for (i = 0; i < blocklen; i++) {
-            UART_PrintHexWidth(debug, buff[i], 2);
-            UART_Print(debug, ((i % 16) == 15 ? "\r\n" : " "));
+
+    bool success = true;
+
+    for (uint32_t blockID = 0; blockID < numBlocksRead; blockID++) {
+        if (!SD_ReadBlock(card, blockID, buff)) {
+            UART_Printf(debug,
+                "ERROR: Failed to read block %lu of SD card\r\n", blockID);
+            success = false;
         }
-        if ((blocklen % 16) != 0) {
-            UART_Print(debug, "\r\n");
+        else {
+            uintptr_t i;
+            if ((blockID % 128) == 0) {
+                UART_Printf(debug, "Block %lu:\r\n", blockID);
+                printSDBlock(buff, blocklen, blockID);
+            }
+            for (i = 0; i < blocklen; i++) {
+                if (buff[i] != (uint8_t)((i * (dataMultiplier - 1) * blockID) % 255)) {
+                    success = false;
+                    break;
+                }
+            }
+            if (success) {
+                UART_Printf(
+                   debug, "Block %lu is as expected\r\n", blockID);
+            }
+            else {
+                UART_Printf(
+                    debug, "ERROR: unexpected data (%u != %lu) in block %lu\r\n",
+                    buff[i], ((i * (dataMultiplier - 1) * blockID) % 255), blockID);
+            }
         }
-        UART_Print(debug, "\r\n");
+        if (!success) {
+            break;
+        }
+    }
+
+    if (success) {
+        UART_Printf(
+            debug, "%lu blocks read and are consistent\r\n",
+            numBlocksRead);
     }
 }
 
 // Write Block
 static void buttonB(void)
 {
-    UART_Print(debug, "Writing to card: ");
+    UART_Print(debug, "Writing to card:\r\n");
 
     static uint8_t buff[MAX_WRITE_BLOCK_LEN] = {0};
-    static uint8_t multiplier                = 1;
     uintptr_t blocklen = SD_GetBlockLen(card);
 
-    // update buffer
-    for (uintptr_t i = 0; i < blocklen; i++) {
-        buff[i] = (uint8_t)((i * multiplier) % 255);
-    }
-    if (!SD_WriteBlock(card, 0, buff)) {
-        UART_Print(debug,
-            "FAIL\r\nERROR: Failed to write first block of SD card\r\n");
-    }
-    else {
-        UART_Printf(debug, "OK (x%u)\r\n", multiplier);
+    bool success = true;
+
+    // update buffers
+    for (uint32_t blockID = 0; blockID < numBlocksWrite; blockID++) {
+        for (uintptr_t i = 0; i < blocklen; i++) {
+            buff[i] = (uint8_t)((i * dataMultiplier * blockID) % 255);
+        }
+        if (!SD_WriteBlock(card, blockID, buff)) {
+            UART_Printf(debug,
+                "ERROR: Failed to write block %lu of SD card\r\n",
+                blockID);
+            success = false;
+            break;
+        }
+        else if ((blockID % 256) == 0) {
+            UART_Printf(
+                debug, "Wrote block %lu successfully (multiplier = %u)\r\n",
+                blockID, dataMultiplier);
+        }
     }
 
-    multiplier++;
+    if (success) {
+        UART_Printf(
+            debug, "%lu blocks written successfully\r\n", numBlocksWrite);
+    }
+
+    numBlocksWrite += NUM_BLOCKS_RW_DELTA;
+    numBlocksRead  += NUM_BLOCKS_RW_DELTA;
+    dataMultiplier++;
 }
 
 typedef struct ButtonState {
@@ -181,7 +246,8 @@ _Noreturn void RTCoreMain(void)
     GPIO_ConfigurePinForInput(buttons[1].gpioPin);
 
     // Setup GPT0 to poll for button press
-    if (!(buttonTimeout = GPT_Open(MT3620_UNIT_GPT0, 1000, GPT_MODE_REPEAT))) {
+    if (!(buttonTimeout = GPT_Open(
+        MT3620_UNIT_GPT0, MT3620_GPT_012_LOW_SPEED, GPT_MODE_REPEAT))) {
         UART_Print(debug, "ERROR: Opening timer\r\n");
     }
     int32_t error;

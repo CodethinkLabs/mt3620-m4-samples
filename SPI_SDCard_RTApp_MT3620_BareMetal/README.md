@@ -3,6 +3,9 @@
 This application demonstrates the MT3620 M4 core SPI peripheral. It uses a
 wrapper on-top of the SPI drivers to read from an SD card (`SD.h/c`).
 
+Note that you should set the number of blocks to be written / read in main.c
+by altering the `#define NUM_BLOCKS_WRITE ...` line.
+
 # How to build the application
 
 See the top level [README](../README.md) for details.
