@@ -51,4 +51,4 @@
 	url = https://github.com/azure-rtos/threadx
 [submodule "EINT_RTApp_MT3620_BareMetal/lib"]
 	path = EINT_RTApp_MT3620_BareMetal/lib
-	url = git@github.com:CodethinkLabs/mt3620-m4-drivers.git
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
