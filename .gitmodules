@@ -52,3 +52,6 @@
 [submodule "EINT_RTApp_MT3620_BareMetal/lib"]
 	path = EINT_RTApp_MT3620_BareMetal/lib
 	url = https://github.com/CodethinkLabs/mt3620-m4-drivers
+[submodule "Super_Serious_Sample/lib"]
+	path = Super_Serious_Sample/lib
+	url = https://github.com/CodethinkLabs/mt3620-m4-drivers

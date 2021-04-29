@@ -1,0 +1,12 @@
+{
+  "SchemaVersion": 1,
+  "Name": "SUPER_SERIOUS",
+  "ComponentId": "18b8807b-541b-4953-8c9f-9135eedcc376",
+  "EntryPoint": "/bin/app",
+  "CmdArgs": [],
+  "Capabilities": {
+    "Gpio": [ 0, 1, 2, 3, 12 ],
+    "I2cMaster": [ "ISU1" ]
+  },
+  "ApplicationType": "RealTimeCapable"
+}
