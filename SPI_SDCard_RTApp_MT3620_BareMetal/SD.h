@@ -1,3 +1,6 @@
+/* Copyright (c) Codethink Ltd. All rights reserved.
+   Licensed under the MIT License. */
+
 #ifndef SD_H_
 #define SD_H_
 

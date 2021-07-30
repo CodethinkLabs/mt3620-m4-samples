@@ -1,3 +1,6 @@
+/* Copyright (c) Codethink Ltd. All rights reserved.
+   Licensed under the MIT License. */
+
 #include "lib/mt3620/gpt.h"
 
 #include "SD.h"
