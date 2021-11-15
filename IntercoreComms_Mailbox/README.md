@@ -93,12 +93,19 @@ The high-level application output will be displayed in the Output window in Visu
 Remote debugging from host 192.168.35.1, port 55990
 High-level intercore comms application.
 Sends data to, and receives data from a real-time capable application.
-Sending: hl-app-to-rt-app-00
-Received 19 bytes: rt-app-to-hl-app-01
-Sending: hl-app-to-rt-app-01
-Received 19 bytes: rt-app-to-hl-app-01
-Sending: hl-app-to-rt-app-02
-Received 19 bytes: rt-app-to-hl-app-01
+Running main loop.
+SocketEventHandler
+Received 9 bytes: count-05
+
+Sending: hl-app-to-rt-app-adding00
+SocketEventHandler
+Received 9 bytes: count-05
+
+Sending: hl-app-to-rt-app-adding01
+SocketEventHandler
+Received 9 bytes: count-05
+
+Sending: hl-app-to-rt-app-adding02
 ```
 
 Because the HLApp and RTApp are not synchronized, the specific numbers in the messages may start from different places.
@@ -109,14 +116,18 @@ The real-time capable application output will be sent to the serial terminal for
 --------------------------------
 IntercoreComms_RTApp_MT3620_BareMetal
 App built on: Mar 21 2020, 13:23:18
+Message received: hl-app-to-rt-app-adding00
 Sender: 25025d2c-66da-4448-bae1-ac26fcdd3627
-Message size: 19 bytes:
-Hex: 68:6c:2d:61:70:70:2d:74:6f:2d:72:74:2d:61:70:70:2d:30:30
-Text: hl-app-to-rt-app-00
+sending msg count-05
+Message received: hl-app-to-rt-app-adding01
 Sender: 25025d2c-66da-4448-bae1-ac26fcdd3627
-Message size: 19 bytes:
-Hex: 68:6c:2d:61:70:70:2d:74:6f:2d:72:74:2d:61:70:70:2d:30:31
-Text: hl-app-to-rt-app-01
+sending msg count-05
+Message received: hl-app-to-rt-app-adding02
+Sender: 25025d2c-66da-4448-bae1-ac26fcdd3627
+sending msg count-05
 ```
 
 Again, the numbers in the messages may start from different places.
+
+The host will repeatedly send the message "count-05", the number will decrease every time button A is pressed and increase when button B is pressed.
+When the counter reaches zero a socket reset will be simulated.
