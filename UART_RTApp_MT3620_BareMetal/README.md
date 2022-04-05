@@ -65,6 +65,5 @@ Install a loopback header on ISU0, and press button A to send a message.
 After you press button A the a message similar to the following will be displayed:
 
 ```
-UART received 12 bytes: 'RTCore: Hell'.
-UART received 8 bytes: 'o world!'.
+UART received 20 bytes: 'RTCore: Hello world!'.
 ```
